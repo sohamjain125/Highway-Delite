@@ -105,6 +105,9 @@ const SignUp: React.FC = () => {
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}
+            onError={(e) => {
+              console.error('Background image failed to load');
+            }}
           />
           <div className="relative z-10">
           <div className="mobile-status-bar">
@@ -522,6 +525,11 @@ const SignUp: React.FC = () => {
             src="/right-column.png" 
             alt="Highway Delite" 
             className="w-full h-full object-cover"
+            onError={(e) => {
+              console.error('Image failed to load:', e);
+              e.currentTarget.style.display = 'none';
+            }}
+            onLoad={() => console.log('Image loaded successfully')}
           />
         </div>
       </div>
