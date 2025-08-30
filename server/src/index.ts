@@ -1,50 +1,48 @@
+import dotenv from 'dotenv';
+
+// Load environment variables FIRST, before any other imports
+dotenv.config({ path: '.env' });
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
 import cookieParser from 'cookie-parser';
 import session from 'express-session';
-import passport from 'passport';
-import dotenv from 'dotenv';
 import { connectDB } from './config/database';
+import passport from './config/passport';
 import { errorHandler } from './middleware/errorHandler';
-import authRoutes from './routes/auth';
-import noteRoutes from './routes/notes';
-import './config/passport';
 
-// Load environment variables
-dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Security middleware
-app.use(helmet());
-
-// Rate limiting
-const limiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: 'Too many requests from this IP, please try again later.'
-});
-app.use('/api/', limiter);
-
-// CORS configuration
+// CORS configuration - MUST come before security middleware
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  origin: [process.env.FRONTEND_URL || 'http://localhost:5173', 'http://localhost:3000'],
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range']
+}));
+
+// Security middleware
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
+app.use(rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100 // limit each IP to 100 requests per windowMs
 }));
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.urlencoded({ extended: true }));
 
 // Cookie and session middleware
 app.use(cookieParser());
 app.use(session({
-  secret: process.env.JWT_SECRET || 'fallback-secret',
+  secret: process.env.SESSION_SECRET || 'your-secret-key',
   resave: false,
   saveUninitialized: false,
   cookie: {
@@ -54,46 +52,44 @@ app.use(session({
   }
 }));
 
-// Passport middleware
+// Initialize Passport
 app.use(passport.initialize());
 app.use(passport.session());
 
 // Health check endpoint
 app.get('/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+  res.json({
+    success: true,
     message: 'Highway Delite API is running',
     timestamp: new Date().toISOString()
   });
 });
 
 // API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/notes', noteRoutes);
+app.use('/api/auth', require('./routes/auth').default);
+app.use('/api/notes', require('./routes/notes').default);
 
 // 404 handler
 app.use('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Route not found',
-    path: req.originalUrl
+  res.status(404).json({
+    success: false,
+    message: 'Route not found'
   });
 });
 
-// Error handling middleware
+// Global error handler
 app.use(errorHandler);
 
-// Start server
+// Connect to MongoDB and start server
 const startServer = async () => {
   try {
-    // Connect to MongoDB
     await connectDB();
     console.log('✅ Connected to MongoDB');
     
-    // Start Express server
     app.listen(PORT, () => {
       console.log(`🚀 Server running on port ${PORT}`);
-      console.log(`📱 Frontend URL: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
-      console.log(`🔗 API URL: http://localhost:${PORT}/api`);
+      console.log(`📱 Frontend URL sxcsdsd: ${process.env.FRONTEND_URL || 'http://localhost:5173'}`);
+      console.log(`🔗 Health check: http://localhost:${PORT}/health`);
     });
   } catch (error) {
     console.error('❌ Failed to start server:', error);
@@ -103,13 +99,4 @@ const startServer = async () => {
 
 startServer();
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('SIGTERM received, shutting down gracefully');
-  process.exit(0);
-});
-
-process.on('SIGINT', () => {
-  console.log('SIGINT received, shutting down gracefully');
-  process.exit(0);
-});
+export default app;

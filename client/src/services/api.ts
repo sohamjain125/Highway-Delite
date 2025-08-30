@@ -79,9 +79,9 @@ class ApiService {
     }
   }
 
-  async delete<T>(url: string): Promise<T> {
+  async delete<T>(url: string, params?: any): Promise<T> {
     try {
-      const response = await this.api.delete<T>(url)
+      const response = await this.api.delete<T>(url, { params })
       return response.data
     } catch (error) {
       throw this.handleError(error)

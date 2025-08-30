@@ -1,274 +1,243 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
 import passport from 'passport';
+import { User, IUser } from '../models/User';
 import { authenticateToken, generateToken } from '../middleware/auth';
 import { validate, signupValidation, otpValidation, signinValidation } from '../middleware/validation';
 import { asyncHandler } from '../middleware/errorHandler';
-import { User } from '../models/User';
-import { sendOTP } from '../services/emailService';
+import { emailService } from '../services/emailService';
 
 const router = express.Router();
 
-// @route   POST /api/auth/signup
-// @desc    Register new user and send OTP
-// @access  Public
-router.post('/signup', validate(signupValidation), asyncHandler(async (req, res) => {
+// Signup route
+router.post('/signup', validate(signupValidation), asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { name, email, dateOfBirth } = req.body;
 
   // Check if user already exists
   const existingUser = await User.findOne({ email });
   if (existingUser) {
-    return res.status(400).json({
+    res.status(400).json({
       success: false,
       message: 'User with this email already exists'
     });
+    return;
   }
 
-  // Create user with OTP
+  // Create new user (passwordless)
   const user = new User({
     name,
     email,
-    dateOfBirth: dateOfBirth ? new Date(dateOfBirth) : undefined,
+    dateOfBirth,
     authMethod: 'email'
   });
 
-  // Generate and send OTP
-  const otp = user.generateOTP();
   await user.save();
 
-  // Send OTP via email
+  // Generate and send OTP
+  const otp = (user as any).generateOTP();
+  await user.save();
+
   try {
-    await sendOTP(email, otp, name);
+    await emailService.sendOTP(email, otp, name);
   } catch (error) {
-    // If email fails, delete user and return error
-    await User.findByIdAndDelete(user._id);
-    return res.status(500).json({
+    console.error('Failed to send OTP:', error);
+    res.status(500).json({
       success: false,
       message: 'Failed to send OTP. Please try again.'
     });
+    return;
   }
 
   res.status(201).json({
     success: true,
-    message: 'OTP sent to your email. Please check and verify.',
-    data: {
-      userId: user._id,
-      email: user.email,
-      name: user.name
-    }
+    message: 'OTP sent to your email address',
+    userId: user._id
   });
 }));
 
-// @route   POST /api/auth/verify-otp
-// @desc    Verify OTP and complete registration
-// @access  Public
-router.post('/verify-otp', validate(otpValidation), asyncHandler(async (req, res) => {
+// Verify OTP route
+router.post('/verify-otp', validate(otpValidation), asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { email, otp } = req.body;
 
-  // Find user by email
   const user = await User.findOne({ email });
   if (!user) {
-    return res.status(400).json({
+    res.status(404).json({
       success: false,
       message: 'User not found'
     });
+    return;
   }
 
-  // Verify OTP
-  if (!user.verifyOTP(otp)) {
-    return res.status(400).json({
+  if (!(user as any).verifyOTP(otp)) {
+    res.status(400).json({
       success: false,
       message: 'Invalid or expired OTP'
     });
+    return;
   }
 
-  // Set password (using OTP as password for now)
-  user.password = otp;
+  // Mark email as verified and clear OTP
   user.isEmailVerified = true;
-  user.clearOTP();
+  (user as any).clearOTP();
   await user.save();
 
-  // Generate JWT token
-  const token = generateToken(user._id.toString());
-
-  res.status(200).json({
-    success: true,
-    message: 'Account created successfully',
-    data: {
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        isEmailVerified: user.isEmailVerified
-      }
-    }
-  });
-}));
-
-// @route   POST /api/auth/signin
-// @desc    Authenticate user and return token
-// @access  Public
-router.post('/signin', validate(signinValidation), asyncHandler(async (req, res) => {
-  const { email, password } = req.body;
-
-  // Find user by email
-  const user = await User.findOne({ email });
-  if (!user) {
-    return res.status(401).json({
-      success: false,
-      message: 'Invalid credentials'
-    });
-  }
-
-  // Check if user has password (email auth method)
-  if (user.authMethod === 'email' && !user.password) {
-    return res.status(401).json({
-      success: false,
-      message: 'Please sign up first'
-    });
-  }
-
-  // Verify password
-  if (user.authMethod === 'email') {
-    const isPasswordValid = await user.comparePassword(password);
-    if (!isPasswordValid) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid credentials'
-      });
-    }
+  // Send welcome email
+  try {
+    await emailService.sendWelcomeEmail(user.email, user.name);
+  } catch (error) {
+    console.error('Failed to send welcome email:', error);
+    // Don't fail the verification if welcome email fails
   }
 
   // Generate JWT token
-  const token = generateToken(user._id.toString());
+  const token = generateToken((user as any)._id.toString());
 
-  res.status(200).json({
+  res.json({
     success: true,
-    message: 'Login successful',
-    data: {
-      token,
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-        isEmailVerified: user.isEmailVerified,
-        authMethod: user.authMethod
-      }
+    message: 'Email verified successfully',
+    token,
+    user: {
+      id: (user as any)._id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar
     }
   });
 }));
 
-// @route   GET /api/auth/google
-// @desc    Initiate Google OAuth
-// @access  Public
-router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
-
-// @route   GET /api/auth/google/callback
-// @desc    Google OAuth callback
-// @access  Public
-router.get('/google/callback', 
-  passport.authenticate('google', { failureRedirect: '/login' }),
-  asyncHandler(async (req, res) => {
-    try {
-      const user = req.user as any;
-      
-      if (!user) {
-        return res.status(401).json({
-          success: false,
-          message: 'Google authentication failed'
-        });
-      }
-
-      // Generate JWT token
-      const token = generateToken(user._id.toString());
-
-      // Redirect to frontend with token
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      res.redirect(`${frontendUrl}/auth/callback?token=${token}`);
-    } catch (error) {
-      console.error('Google OAuth callback error:', error);
-      const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-      res.redirect(`${frontendUrl}/auth/error?message=Authentication failed`);
-    }
-  })
-);
-
-// @route   POST /api/auth/signout
-// @desc    Sign out user
-// @access  Private
-router.post('/signout', authenticateToken, asyncHandler(async (req, res) => {
-  // In a stateless JWT system, the client just needs to remove the token
-  // But we can add any cleanup logic here if needed
-  
-  res.status(200).json({
-    success: true,
-    message: 'Signed out successfully'
-  });
-}));
-
-// @route   GET /api/auth/me
-// @desc    Get current user profile
-// @access  Private
-router.get('/me', authenticateToken, asyncHandler(async (req, res) => {
-  const user = req.user;
-  
-  res.status(200).json({
-    success: true,
-    data: {
-      user: {
-        id: user._id,
-        name: user.name,
-        email: user.email,
-        avatar: user.avatar,
-        isEmailVerified: user.isEmailVerified,
-        authMethod: user.authMethod,
-        dateOfBirth: user.dateOfBirth,
-        createdAt: user.createdAt
-      }
-    }
-  });
-}));
-
-// @route   POST /api/auth/resend-otp
-// @desc    Resend OTP to user's email
-// @access  Public
-router.post('/resend-otp', asyncHandler(async (req, res) => {
+// Signin route (Passwordless - sends OTP)
+router.post('/signin', validate(signinValidation), asyncHandler(async (req: Request, res: Response): Promise<void> => {
   const { email } = req.body;
 
-  if (!email) {
-    return res.status(400).json({
-      success: false,
-      message: 'Email is required'
-    });
-  }
-
-  // Find user by email
   const user = await User.findOne({ email });
   if (!user) {
-    return res.status(400).json({
+    res.status(401).json({
       success: false,
-      message: 'User not found'
+      message: 'User not found. Please sign up first.'
     });
+    return;
   }
 
-  // Generate new OTP
-  const otp = user.generateOTP();
+  // Check if user signed up with Google
+  if (user.authMethod === 'google') {
+    res.status(400).json({
+      success: false,
+      message: 'Please sign in with Google'
+    });
+    return;
+  }
+
+  // Check if email is verified
+  if (!user.isEmailVerified) {
+    res.status(400).json({
+      success: false,
+      message: 'Please verify your email address first'
+    });
+    return;
+  }
+
+  // Generate and send OTP for signin
+  const otp = (user as any).generateOTP();
   await user.save();
 
-  // Send new OTP
   try {
-    await sendOTP(email, otp, user.name);
+    await emailService.sendOTP(email, otp, user.name);
   } catch (error) {
-    return res.status(500).json({
+    console.error('Failed to send OTP:', error);
+    res.status(500).json({
       success: false,
       message: 'Failed to send OTP. Please try again.'
     });
+    return;
   }
 
-  res.status(200).json({
+  res.json({
     success: true,
-    message: 'New OTP sent to your email'
+    message: 'OTP sent to your email address'
+  });
+}));
+
+// Google OAuth routes
+router.get('/google', passport.authenticate('google', {
+  scope: ['profile', 'email']
+}));
+
+router.get('/google/callback',
+  passport.authenticate('google', { session: false }),
+  asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const user = req.user as IUser;
+    const token = generateToken((user as any)._id.toString());
+
+    // Redirect to frontend with token
+    res.redirect(`${process.env.FRONTEND_URL}/auth/callback?token=${token}`);
+  })
+);
+
+// Signout route
+router.post('/signout', authenticateToken, asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  // In a stateless JWT setup, the client is responsible for removing the token
+  // This endpoint can be used for logging purposes or future token blacklisting
+  res.json({
+    success: true,
+    message: 'Sign out successful'
+  });
+}));
+
+// Get current user profile
+router.get('/me', authenticateToken, asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const user = req.user;
+  
+  res.json({
+    success: true,
+    user: {
+      id: (user as any)._id,
+      name: (user as any).name,
+      email: (user as any).email,
+      dateOfBirth: (user as any).dateOfBirth,
+      avatar: (user as any).avatar,
+      authMethod: (user as any).authMethod
+    }
+  });
+}));
+
+// Resend OTP route
+router.post('/resend-otp', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const { email } = req.body;
+
+  const user = await User.findOne({ email });
+  if (!user) {
+    res.status(404).json({
+      success: false,
+      message: 'User not found'
+    });
+    return;
+  }
+
+  if (user.isEmailVerified) {
+    res.status(400).json({
+      success: false,
+      message: 'Email is already verified'
+    });
+    return;
+  }
+
+  // Generate new OTP
+  const otp = (user as any).generateOTP();
+  await user.save();
+
+  try {
+    await emailService.sendOTP(user.email, otp, user.name);
+  } catch (error) {
+    console.error('Failed to send OTP:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to send OTP. Please try again.'
+    });
+    return;
+  }
+
+  res.json({
+    success: true,
+      message: 'OTP resent successfully'
   });
 }));
 

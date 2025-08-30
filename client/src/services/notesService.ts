@@ -31,7 +31,8 @@ class NotesService {
   }
 
   async deleteMultipleNotes(ids: string[]): Promise<void> {
-    return apiService.delete('/notes', { noteIds: ids })
+    const params = { noteIds: ids.join(',') }
+    return apiService.delete('/notes', params)
   }
 
   async togglePinNote(id: string): Promise<Note> {

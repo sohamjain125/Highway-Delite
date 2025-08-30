@@ -1,89 +1,84 @@
-import express from 'express';
+import express, { Request, Response } from 'express';
+import { Note, INote } from '../models/Note';
 import { authenticateToken } from '../middleware/auth';
 import { validate, noteValidation, noteUpdateValidation } from '../middleware/validation';
 import { asyncHandler } from '../middleware/errorHandler';
-import { Note } from '../models/Note';
 
 const router = express.Router();
 
 // Apply authentication middleware to all routes
 router.use(authenticateToken);
 
-// @route   GET /api/notes
-// @desc    Get all notes for authenticated user
-// @access  Private
-router.get('/', asyncHandler(async (req, res) => {
-  const { page = 1, limit = 20, search, tag } = req.query;
-  const userId = req.user._id;
+// Get all notes for the authenticated user
+router.get('/', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const userId = (req.user as any)._id;
+  const page = parseInt(req.query.page as string) || 1;
+  const limit = parseInt(req.query.limit as string) || 10;
+  const search = req.query.search as string;
+  const tag = req.query.tag as string;
 
   let query: any = { userId };
 
   // Add search functionality
-  if (search && typeof search === 'string') {
+  if (search) {
     query.$text = { $search: search };
   }
 
   // Add tag filter
-  if (tag && typeof tag === 'string') {
-    query.tags = { $in: [tag] };
+  if (tag) {
+    query.tags = tag;
   }
 
-  const pageNum = parseInt(page as string, 10);
-  const limitNum = parseInt(limit as string, 10);
-  const skip = (pageNum - 1) * limitNum;
-
-  // Get notes with pagination
+  const skip = (page - 1) * limit;
+  
   const notes = await Note.find(query)
     .sort({ isPinned: -1, updatedAt: -1 })
     .skip(skip)
-    .limit(limitNum);
+    .limit(limit);
 
-  // Get total count for pagination
   const total = await Note.countDocuments(query);
+  const totalPages = Math.ceil(total / limit);
 
-  res.status(200).json({
+  res.json({
     success: true,
     data: {
       notes,
       pagination: {
-        currentPage: pageNum,
-        totalPages: Math.ceil(total / limitNum),
-        totalNotes: total,
-        hasNextPage: pageNum * limitNum < total,
-        hasPrevPage: pageNum > 1
+        page,
+        limit,
+        total,
+        totalPages,
+        hasNext: page < totalPages,
+        hasPrev: page > 1
       }
     }
   });
 }));
 
-// @route   GET /api/notes/:id
-// @desc    Get a specific note by ID
-// @access  Private
-router.get('/:id', asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user._id;
+// Get a specific note
+router.get('/:id', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const userId = (req.user as any)._id;
+  const noteId = req.params.id;
 
-  const note = await Note.findOne({ _id: id, userId });
-  
+  const note = await Note.findOne({ _id: noteId, userId });
   if (!note) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       message: 'Note not found'
     });
+    return;
   }
 
-  res.status(200).json({
+  res.json({
     success: true,
     data: { note }
   });
 }));
 
-// @route   POST /api/notes
-// @desc    Create a new note
-// @access  Private
-router.post('/', validate(noteValidation), asyncHandler(async (req, res) => {
+// Create a new note
+router.post('/', validate(noteValidation), asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const userId = (req.user as any)._id;
   const { title, content, tags, color, isPinned } = req.body;
-  const userId = req.user._id;
 
   const note = new Note({
     title,
@@ -103,71 +98,68 @@ router.post('/', validate(noteValidation), asyncHandler(async (req, res) => {
   });
 }));
 
-// @route   PUT /api/notes/:id
-// @desc    Update a note
-// @access  Private
-router.put('/:id', validate(noteUpdateValidation), asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user._id;
-  const updateData = req.body;
+// Update a note
+router.put('/:id', validate(noteUpdateValidation), asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const userId = (req.user as any)._id;
+  const noteId = req.params.id;
+  const { title, content, tags, color, isPinned } = req.body;
 
-  // Remove userId from update data to prevent changing ownership
-  delete updateData.userId;
-
-  const note = await Note.findOneAndUpdate(
-    { _id: id, userId },
-    updateData,
-    { new: true, runValidators: true }
-  );
-
+  const note = await Note.findOne({ _id: noteId, userId });
   if (!note) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       message: 'Note not found'
     });
+    return;
   }
 
-  res.status(200).json({
+  // Update fields
+  if (title !== undefined) note.title = title;
+  if (content !== undefined) note.content = content;
+  if (tags !== undefined) note.tags = tags;
+  if (color !== undefined) note.color = color;
+  if (isPinned !== undefined) note.isPinned = isPinned;
+
+  await note.save();
+
+  res.json({
     success: true,
     message: 'Note updated successfully',
     data: { note }
   });
 }));
 
-// @route   DELETE /api/notes/:id
-// @desc    Delete a note
-// @access  Private
-router.delete('/:id', asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user._id;
+// Delete a note
+router.delete('/:id', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const userId = (req.user as any)._id;
+  const noteId = req.params.id;
 
-  const note = await Note.findOneAndDelete({ _id: id, userId });
-
+  const note = await Note.findOneAndDelete({ _id: noteId, userId });
   if (!note) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       message: 'Note not found'
     });
+    return;
   }
 
-  res.status(200).json({
+  res.json({
     success: true,
     message: 'Note deleted successfully'
   });
 }));
 
-// @route   DELETE /api/notes
-// @desc    Delete multiple notes
-// @access  Private
-router.delete('/', asyncHandler(async (req, res) => {
+// Delete multiple notes
+router.delete('/', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const userId = (req.user as any)._id;
   const { noteIds } = req.body;
-  const userId = req.user._id;
 
-  if (!Array.isArray(noteIds) || noteIds.length === 0) {
-    return res.status(400).json({
+  if (!noteIds || !Array.isArray(noteIds) || noteIds.length === 0) {
+    res.status(400).json({
       success: false,
       message: 'Note IDs array is required'
     });
+    return;
   }
 
   const result = await Note.deleteMany({
@@ -175,78 +167,60 @@ router.delete('/', asyncHandler(async (req, res) => {
     userId
   });
 
-  if (result.deletedCount === 0) {
-    return res.status(404).json({
-      success: false,
-      message: 'No notes found to delete'
-    });
-  }
-
-  res.status(200).json({
+  res.json({
     success: true,
-    message: `${result.deletedCount} note(s) deleted successfully`
+    message: `${result.deletedCount} notes deleted successfully`
   });
 }));
 
-// @route   PATCH /api/notes/:id/pin
-// @desc    Toggle pin status of a note
-// @access  Private
-router.patch('/:id/pin', asyncHandler(async (req, res) => {
-  const { id } = req.params;
-  const userId = req.user._id;
+// Toggle pin status
+router.patch('/:id/pin', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const userId = (req.user as any)._id;
+  const noteId = req.params.id;
 
-  const note = await Note.findOne({ _id: id, userId });
-  
+  const note = await Note.findOne({ _id: noteId, userId });
   if (!note) {
-    return res.status(404).json({
+    res.status(404).json({
       success: false,
       message: 'Note not found'
     });
+    return;
   }
 
   note.isPinned = !note.isPinned;
   await note.save();
 
-  res.status(200).json({
+  res.json({
     success: true,
     message: `Note ${note.isPinned ? 'pinned' : 'unpinned'} successfully`,
     data: { note }
   });
 }));
 
-// @route   GET /api/notes/tags/all
-// @desc    Get all unique tags for authenticated user
-// @access  Private
-router.get('/tags/all', asyncHandler(async (req, res) => {
-  const userId = req.user._id;
+// Get all unique tags for the user
+router.get('/tags/all', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const userId = (req.user as any)._id;
 
-  const tags = await Note.aggregate([
-    { $match: { userId } },
-    { $unwind: '$tags' },
-    { $group: { _id: '$tags' } },
-    { $sort: { _id: 1 } }
-  ]);
+  const tags = await Note.distinct('tags', { userId });
+  const filteredTags = tags.filter(tag => tag && tag.trim() !== '');
 
-  const uniqueTags = tags.map(tag => tag._id).filter(tag => tag);
-
-  res.status(200).json({
+  res.json({
     success: true,
-    data: { tags: uniqueTags }
+    data: { tags: filteredTags }
   });
 }));
 
-// @route   GET /api/notes/search/suggestions
-// @desc    Get search suggestions based on note content
-// @access  Private
-router.get('/search/suggestions', asyncHandler(async (req, res) => {
-  const { query } = req.query;
-  const userId = req.user._id;
+// Get search suggestions
+router.get('/search/suggestions', asyncHandler(async (req: Request, res: Response): Promise<void> => {
+  const userId = (req.user as any)._id;
+  const query = req.query.q as string;
 
-  if (!query || typeof query !== 'string') {
-    return res.status(400).json({
-      success: false,
-      message: 'Search query is required'
+  if (!query || query.trim().length < 2) {
+    res.json({
+      success: true,
+      data: { suggestions: [] }
     });
+    return;
   }
 
   const suggestions = await Note.find({
@@ -260,7 +234,7 @@ router.get('/search/suggestions', asyncHandler(async (req, res) => {
   .select('title tags')
   .limit(5);
 
-  res.status(200).json({
+  res.json({
     success: true,
     data: { suggestions }
   });

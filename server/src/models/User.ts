@@ -31,32 +31,30 @@ const userSchema = new Schema<IUser>({
     unique: true,
     lowercase: true,
     trim: true,
-    match: [
-      /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-      'Please enter a valid email address'
-    ]
+    match: [/^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/, 'Please enter a valid email']
   },
   password: {
     type: String,
-    required: function(this: IUser) {
-      return this.authMethod === 'email';
-    },
+    required: false, // Password is optional for passwordless auth
     minlength: [6, 'Password must be at least 6 characters long']
   },
   dateOfBirth: {
     type: Date,
+    required: function() { return this.authMethod === 'email'; },
     validate: {
       validator: function(value: Date) {
         if (!value) return true;
         const today = new Date();
-        const age = today.getFullYear() - value.getFullYear();
+        let age = today.getFullYear() - value.getFullYear();
         const monthDiff = today.getMonth() - value.getMonth();
+        
         if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < value.getDate())) {
           age--;
         }
+        
         return age >= 13;
       },
-      message: 'User must be at least 13 years old'
+      message: 'You must be at least 13 years old to register'
     }
   },
   googleId: {
@@ -65,7 +63,7 @@ const userSchema = new Schema<IUser>({
   },
   avatar: {
     type: String,
-    default: ''
+    default: null
   },
   isEmailVerified: {
     type: Boolean,
@@ -87,18 +85,22 @@ const userSchema = new Schema<IUser>({
 }, {
   timestamps: true,
   toJSON: {
-    transform: function(doc, ret) {
+    transform: function(doc, ret: any) {
+      ret.id = ret._id;
+      delete ret._id;
       delete ret.password;
       delete ret.otp;
       delete ret.otpExpiry;
+      delete (ret as any).__v;
       return ret;
     }
   }
 });
 
-// Index for better query performance
+// Create indexes
 userSchema.index({ email: 1 });
 userSchema.index({ googleId: 1 });
+userSchema.index({ authMethod: 1 });
 
 // Hash password before saving
 userSchema.pre('save', async function(next) {

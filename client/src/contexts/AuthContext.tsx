@@ -7,7 +7,8 @@ interface AuthContextType {
   loading: boolean
   signUp: (data: SignUpData) => Promise<void>
   verifyOTP: (data: OTPData) => Promise<void>
-  signIn: (data: SignInData) => Promise<void>
+  signIn: (data: SignInEmailData) => Promise<void>
+  signInWithToken: (token: string) => Promise<void>
   signOut: () => Promise<void>
   resendOTP: (email: string) => Promise<void>
 }
@@ -23,10 +24,11 @@ interface OTPData {
   otp: string
 }
 
-interface SignInData {
+interface SignInEmailData {
   email: string
-  password: string
 }
+
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
@@ -84,11 +86,19 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   }
 
-  const signIn = async (data: SignInData) => {
+  const signIn = async (data: SignInEmailData) => {
     try {
-      const response = await authService.signIn(data)
-      const { token, user: userData } = response
+      await authService.signIn(data)
+      // Note: For passwordless auth, signIn just sends OTP, doesn't return token/user
+    } catch (error) {
+      throw error
+    }
+  }
+
+  const signInWithToken = async (token: string) => {
+    try {
       localStorage.setItem('token', token)
+      const userData = await authService.getCurrentUser()
       setUser(userData)
     } catch (error) {
       throw error
@@ -122,6 +132,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     signUp,
     verifyOTP,
     signIn,
+    signInWithToken,
     signOut,
     resendOTP
   }

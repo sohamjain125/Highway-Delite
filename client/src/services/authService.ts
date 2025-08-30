@@ -1,5 +1,5 @@
 import apiService from './api'
-import { AuthResponse, User, SignUpData, OTPData, SignInData } from '../types'
+import { AuthResponse, User, SignUpData, OTPData, SignInEmailData } from '../types'
 
 class AuthService {
   async signUp(data: SignUpData): Promise<void> {
@@ -7,13 +7,13 @@ class AuthService {
   }
 
   async verifyOTP(data: OTPData): Promise<AuthResponse> {
-    const response = await apiService.post<{ data: AuthResponse }>('/auth/verify-otp', data)
-    return response.data
+    const response = await apiService.post<AuthResponse>('/auth/verify-otp', data)
+    return response
   }
 
-  async signIn(data: SignInData): Promise<AuthResponse> {
-    const response = await apiService.post<{ data: AuthResponse }>('/auth/signin', data)
-    return response.data
+  async signIn(data: SignInEmailData): Promise<void> {
+    // For passwordless auth, signIn just sends OTP, doesn't return token/user
+    return apiService.post('/auth/signin', data)
   }
 
   async signOut(): Promise<void> {
@@ -21,39 +21,15 @@ class AuthService {
   }
 
   async getCurrentUser(): Promise<User> {
-    const response = await apiService.get<{ data: { user: User } }>('/auth/me')
-    return response.data.user
+    const response = await apiService.get<{ success: boolean; user: User }>('/auth/me')
+    return response.user
   }
 
   async resendOTP(email: string): Promise<void> {
     return apiService.post('/auth/resend-otp', { email })
   }
 
-  // Google OAuth
-  initiateGoogleAuth(): void {
-    const googleAuthUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/google`
-    window.location.href = googleAuthUrl
-  }
 
-  // Handle Google OAuth callback
-  handleGoogleCallback(token: string): AuthResponse {
-    // Store token and return user data
-    localStorage.setItem('token', token)
-    
-    // For now, we'll need to fetch user data separately
-    // In a real implementation, the callback might include user data
-    return {
-      token,
-      user: {
-        id: '',
-        name: '',
-        email: '',
-        isEmailVerified: true,
-        authMethod: 'google',
-        createdAt: new Date().toISOString()
-      }
-    }
-  }
 
   // Check if user is authenticated
   isAuthenticated(): boolean {

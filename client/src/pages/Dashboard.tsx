@@ -7,6 +7,36 @@ import { toast } from 'react-hot-toast'
 import LoadingSpinner from '../components/LoadingSpinner'
 import CreateNoteModal from '../components/CreateNoteModal'
 import EditNoteModal from '../components/EditNoteModal'
+import Logo from '../components/Logo'
+
+// Helper function to get contrasting text color based on background color
+const getContrastColor = (hexColor: string): string => {
+  if (!hexColor || hexColor === '#ffffff') return '#111827' // Default dark text for white
+  
+  // Convert hex to RGB
+  const hex = hexColor.replace('#', '')
+  const r = parseInt(hex.substr(0, 2), 16)
+  const g = parseInt(hex.substr(2, 2), 16)
+  const b = parseInt(hex.substr(4, 2), 16)
+  
+  // Calculate luminance (more accurate formula)
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+  
+  // Enhanced contrast logic
+  if (luminance > 0.7) {
+    // Very light colors - use very dark text
+    return '#000000'
+  } else if (luminance > 0.5) {
+    // Light colors - use dark text
+    return '#111827'
+  } else if (luminance > 0.3) {
+    // Medium colors - use very dark text for better contrast
+    return '#000000'
+  } else {
+    // Dark colors - use white text
+    return '#ffffff'
+  }
+}
 
 const Dashboard: React.FC = () => {
   const { user, signOut } = useAuth()
@@ -110,9 +140,7 @@ const Dashboard: React.FC = () => {
         
         <div className="mobile-header">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-              HD
-            </div>
+            <Logo width={40} height={16} />
             <h1 className="text-xl font-semibold">Dashboard</h1>
           </div>
           <button
@@ -386,6 +414,10 @@ const NoteCard: React.FC<NoteCardProps> = ({
       className={`card cursor-pointer transition-all duration-200 hover:shadow-md ${
         isSelected ? 'ring-2 ring-primary-500 bg-primary-50' : ''
       }`}
+      style={{
+        backgroundColor: note.color || '#ffffff',
+        borderLeft: `4px solid ${note.color || '#e5e7eb'}`
+      }}
       onClick={() => onSelect(note.id)}
     >
       <div className="flex items-start justify-between mb-3">
@@ -399,9 +431,15 @@ const NoteCard: React.FC<NoteCardProps> = ({
             }}
             className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
           />
-          <h3 className="font-semibold text-gray-900 line-clamp-2">
-            {note.title}
-          </h3>
+                     <h3 
+             className="font-semibold line-clamp-2" 
+             style={{ 
+               color: getContrastColor(note.color),
+               textShadow: getContrastColor(note.color) === '#ffffff' ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
+             }}
+           >
+             {note.title}
+           </h3>
         </div>
         <div className="flex items-center space-x-1">
           <button
@@ -436,9 +474,15 @@ const NoteCard: React.FC<NoteCardProps> = ({
         </div>
       </div>
 
-      <p className="text-gray-600 text-sm line-clamp-3 mb-3">
-        {note.content}
-      </p>
+             <p 
+         className="text-sm line-clamp-3 mb-3" 
+         style={{ 
+           color: getContrastColor(note.color),
+           textShadow: getContrastColor(note.color) === '#ffffff' ? '0 1px 2px rgba(0,0,0,0.8)' : 'none'
+         }}
+       >
+         {note.content}
+       </p>
 
       {note.tags.length > 0 && (
         <div className="flex flex-wrap gap-1 mb-3">

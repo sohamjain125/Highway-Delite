@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { X, Tag, Palette } from 'lucide-react'
+import { X, Tag } from 'lucide-react'
 import { CreateNoteData } from '../types'
 
 interface CreateNoteModalProps {

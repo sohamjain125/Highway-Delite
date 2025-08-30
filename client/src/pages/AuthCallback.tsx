@@ -6,32 +6,44 @@ import LoadingSpinner from '../components/LoadingSpinner'
 const AuthCallback: React.FC = () => {
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { signIn } = useAuth()
+  const { signInWithToken } = useAuth()
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    const token = searchParams.get('token')
-    const errorMessage = searchParams.get('message')
+    const handleAuth = async () => {
+      const token = searchParams.get('token')
+      const errorMessage = searchParams.get('message')
 
-    if (errorMessage) {
-      setError(errorMessage)
-      setTimeout(() => {
-        navigate('/signin')
-      }, 3000)
-      return
+      if (errorMessage) {
+        setError(errorMessage)
+        setTimeout(() => {
+          navigate('/signin')
+        }, 3000)
+        return
+      }
+
+      if (token) {
+        // Complete authentication with token
+        try {
+          await signInWithToken(token)
+          navigate('/dashboard')
+        } catch (error) {
+          console.error('Failed to complete authentication:', error)
+          setError('Failed to complete authentication')
+          setTimeout(() => {
+            navigate('/signin')
+          }, 3000)
+        }
+      } else {
+        setError('No authentication token received')
+        setTimeout(() => {
+          navigate('/signin')
+        }, 3000)
+      }
     }
 
-    if (token) {
-      // Store the token and redirect to dashboard
-      localStorage.setItem('token', token)
-      navigate('/dashboard')
-    } else {
-      setError('No authentication token received')
-      setTimeout(() => {
-        navigate('/signin')
-      }, 3000)
-    }
-  }, [searchParams, navigate])
+    handleAuth()
+  }, [searchParams, navigate, signInWithToken])
 
   if (error) {
     return (

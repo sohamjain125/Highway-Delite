@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react'
 import { notesService } from '../services/notesService'
 import { Note, CreateNoteData, UpdateNoteData } from '../types'
 
@@ -34,7 +34,7 @@ export const NotesProvider: React.FC<NotesProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -45,22 +45,20 @@ export const NotesProvider: React.FC<NotesProviderProps> = ({ children }) => {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const createNote = async (data: CreateNoteData): Promise<Note> => {
+  const createNote = useCallback(async (data: CreateNoteData): Promise<Note> => {
     try {
       setError(null)
       const newNote = await notesService.createNote(data)
       setNotes(prev => [newNote, ...prev])
       return newNote
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : 'Failed to create note'
-      setError(errorMessage)
       throw error
     }
-  }
+  }, [])
 
-  const updateNote = async (id: string, data: UpdateNoteData): Promise<Note> => {
+  const updateNote = useCallback(async (id: string, data: UpdateNoteData): Promise<Note> => {
     try {
       setError(null)
       const updatedNote = await notesService.updateNote(id, data)
@@ -71,9 +69,9 @@ export const NotesProvider: React.FC<NotesProviderProps> = ({ children }) => {
       setError(errorMessage)
       throw error
     }
-  }
+  }, [])
 
-  const deleteNote = async (id: string) => {
+  const deleteNote = useCallback(async (id: string) => {
     try {
       setError(null)
       await notesService.deleteNote(id)
@@ -83,9 +81,9 @@ export const NotesProvider: React.FC<NotesProviderProps> = ({ children }) => {
       setError(errorMessage)
       throw error
     }
-  }
+  }, [])
 
-  const deleteMultipleNotes = async (ids: string[]) => {
+  const deleteMultipleNotes = useCallback(async (ids: string[]) => {
     try {
       setError(null)
       await notesService.deleteMultipleNotes(ids)
@@ -95,9 +93,9 @@ export const NotesProvider: React.FC<NotesProviderProps> = ({ children }) => {
       setError(errorMessage)
       throw error
     }
-  }
+  }, [])
 
-  const togglePinNote = async (id: string) => {
+  const togglePinNote = useCallback(async (id: string) => {
     try {
       setError(null)
       const updatedNote = await notesService.togglePinNote(id)
@@ -107,11 +105,11 @@ export const NotesProvider: React.FC<NotesProviderProps> = ({ children }) => {
       setError(errorMessage)
       throw error
     }
-  }
+  }, [])
 
-  const clearError = () => {
+  const clearError = useCallback(() => {
     setError(null)
-  }
+  }, [])
 
   const value: NotesContextType = {
     notes,

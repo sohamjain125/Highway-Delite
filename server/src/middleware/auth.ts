@@ -1,69 +1,30 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
-import { User } from '../models/User';
-
-// Extend Express Request interface to include user
-declare global {
-  namespace Express {
-    interface Request {
-      user?: any;
-    }
-  }
-}
+import { IUser, User } from '../models/User';
 
 export const authenticateToken = async (req: Request, res: Response, next: NextFunction) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader && authHeader.split(' ')[1];
+
+  if (!token) {
+    res.status(401).json({ message: 'Access token required' });
+    return;
+  }
+
   try {
-    const authHeader = req.headers.authorization;
-    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
-
-    if (!token) {
-      return res.status(401).json({
-        success: false,
-        message: 'Access token is required'
-      });
-    }
-
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'fallback-secret') as any;
-    
-    if (!decoded || !decoded.userId) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
-    }
-
-    // Find user and attach to request
-    const user = await User.findById(decoded.userId).select('-password -otp -otpExpiry');
+    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as { userId: string };
+    const user = await User.findById(decoded.userId).select('-password');
     
     if (!user) {
-      return res.status(401).json({
-        success: false,
-        message: 'User not found'
-      });
+      res.status(401).json({ message: 'Invalid token' });
+      return;
     }
 
-    req.user = user;
+    (req as any).user = user;
     next();
   } catch (error) {
-    if (error instanceof jwt.JsonWebTokenError) {
-      return res.status(401).json({
-        success: false,
-        message: 'Invalid token'
-      });
-    }
-    
-    if (error instanceof jwt.TokenExpiredError) {
-      return res.status(401).json({
-        success: false,
-        message: 'Token expired'
-      });
-    }
-
-    console.error('Auth middleware error:', error);
-    return res.status(500).json({
-      success: false,
-      message: 'Internal server error'
-    });
+    res.status(403).json({ message: 'Invalid token' });
+    return;
   }
 };
 
@@ -85,7 +46,7 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
       if (decoded && decoded.userId) {
         const user = await User.findById(decoded.userId).select('-password -otp -otpExpiry');
         if (user) {
-          req.user = user;
+          (req as any).user = user;
         }
       }
     }

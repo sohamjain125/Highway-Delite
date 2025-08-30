@@ -1,28 +1,27 @@
-import { body, validationResult, ValidationChain } from 'express-validator';
 import { Request, Response, NextFunction } from 'express';
+import { body, validationResult, ValidationChain } from 'express-validator';
 
 export const validate = (validations: ValidationChain[]) => {
-  return async (req: Request, res: Response, next: NextFunction) => {
-    // Execute all validations
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     await Promise.all(validations.map(validation => validation.run(req)));
 
     const errors = validationResult(req);
-    if (errors.isEmpty()) {
-      return next();
+    if (!errors.isEmpty()) {
+      const formattedErrors = errors.array().map(error => ({
+        field: error.type === 'field' ? error.path : 'unknown',
+        message: error.msg,
+        value: error.type === 'field' ? (error as any).value : undefined
+      }));
+
+      res.status(400).json({
+        success: false,
+        message: 'Validation failed',
+        errors: formattedErrors
+      });
+      return;
     }
 
-    // Format validation errors
-    const formattedErrors = errors.array().map(error => ({
-      field: error.type === 'field' ? error.path : 'unknown',
-      message: error.msg,
-      value: error.value
-    }));
-
-    return res.status(400).json({
-      success: false,
-      message: 'Validation failed',
-      errors: formattedErrors
-    });
+    next();
   };
 };
 
@@ -31,9 +30,7 @@ export const signupValidation = [
   body('name')
     .trim()
     .isLength({ min: 2, max: 50 })
-    .withMessage('Name must be between 2 and 50 characters')
-    .matches(/^[a-zA-Z\s]+$/)
-    .withMessage('Name can only contain letters and spaces'),
+    .withMessage('Name must be between 2 and 50 characters'),
   
   body('email')
     .isEmail()
@@ -41,22 +38,26 @@ export const signupValidation = [
     .withMessage('Please provide a valid email address'),
   
   body('dateOfBirth')
-    .optional()
     .isISO8601()
     .withMessage('Please provide a valid date of birth')
     .custom((value) => {
       const birthDate = new Date(value);
       const today = new Date();
-      const age = today.getFullYear() - birthDate.getFullYear();
+      let age = today.getFullYear() - birthDate.getFullYear();
       const monthDiff = today.getMonth() - birthDate.getMonth();
+      
       if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
         age--;
       }
+      
       if (age < 13) {
-        throw new Error('User must be at least 13 years old');
+        throw new Error('You must be at least 13 years old to register');
       }
+      
       return true;
-    })
+    }),
+  
+
 ];
 
 // Validation rules for OTP verification
@@ -72,16 +73,12 @@ export const otpValidation = [
     .withMessage('OTP must be a 6-digit number')
 ];
 
-// Validation rules for user login
+// Validation rules for user login (Passwordless)
 export const signinValidation = [
   body('email')
     .isEmail()
     .normalizeEmail()
-    .withMessage('Please provide a valid email address'),
-  
-  body('password')
-    .isLength({ min: 6 })
-    .withMessage('Password must be at least 6 characters long')
+    .withMessage('Please provide a valid email address')
 ];
 
 // Validation rules for note creation

@@ -2,45 +2,94 @@ import React, { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { toast } from 'react-hot-toast'
-import { Eye, EyeOff, Mail, Lock } from 'lucide-react'
+import { Mail, Smartphone } from 'lucide-react'
 import { useAuth } from '../contexts/AuthContext'
-import { SignInData } from '../types'
+import {  SignInEmailData, SignInOTPData } from '../types'
 import LoadingSpinner from '../components/LoadingSpinner'
+import Logo from '../components/Logo'
 
 const SignIn: React.FC = () => {
-  const [showPassword, setShowPassword] = useState(false)
+  const [step, setStep] = useState<'email' | 'otp'>('email')
+  const [email, setEmail] = useState('')
   const [loading, setLoading] = useState(false)
-  const { signIn } = useAuth()
+  const [resendCountdown, setResendCountdown] = useState(0)
+
+  const { signIn, verifyOTP, resendOTP } = useAuth()
   const navigate = useNavigate()
 
   const {
-    register,
-    handleSubmit,
-    formState: { errors }
-  } = useForm<SignInData>()
+    register: registerEmail,
+    handleSubmit: handleSubmitEmail,
+    formState: { errors: emailErrors }
+  } = useForm<SignInEmailData>()
 
-  const onSubmit = async (data: SignInData) => {
+  const {
+    register: registerOTP,
+    handleSubmit: handleSubmitOTP,
+    formState: { errors: otpErrors }
+  } = useForm<SignInOTPData>()
+
+  const onSubmitEmail = async (data: SignInEmailData) => {
     try {
       setLoading(true)
       await signIn(data)
-      toast.success('Login successful!')
-      navigate('/dashboard')
+      setEmail(data.email)
+      setStep('otp')
+      toast.success('OTP sent to your email!')
+      setResendCountdown(60)
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Login failed')
+      toast.error(error instanceof Error ? error.message : 'Failed to send OTP')
     } finally {
       setLoading(false)
     }
   }
 
-  const handleGoogleSignIn = () => {
-    // Redirect to Google OAuth
-    window.location.href = `${import.meta.env.VITE_API_URL || 'http://localhost:5000/api'}/auth/google`
+  const onSubmitOTP = async (data: { otp: string }) => {
+    try {
+      setLoading(true)
+      // Verify OTP and complete signin
+      await verifyOTP({
+        email: email,
+        otp: data.otp
+      })
+      toast.success('Sign in successful!')
+      navigate('/dashboard')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'OTP verification failed')
+    } finally {
+      setLoading(false)
+    }
   }
+
+  const handleResendOTP = async () => {
+    try {
+      setLoading(true)
+      await resendOTP(email)
+      toast.success('New OTP sent!')
+      setResendCountdown(60)
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to resend OTP')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Countdown effect
+  React.useEffect(() => {
+    if (resendCountdown > 0) {
+      const timer = setTimeout(() => setResendCountdown(resendCountdown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [resendCountdown])
+
+
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile Layout */}
-      <div className="block md:hidden">
+      <div className="block md:hidden relative">
+
+        <div className="relative z-10">
         <div className="mobile-status-bar">
           <span className="time">9:41</span>
           <div className="icons">
@@ -51,132 +100,126 @@ const SignIn: React.FC = () => {
         
         <div className="mobile-header">
           <div className="flex items-center space-x-3">
-            <div className="w-10 h-10 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold text-lg">
-              HD
-            </div>
+            <Logo width={40} height={16} />
             <h1 className="text-xl font-semibold">Sign in</h1>
           </div>
         </div>
 
-        <div className="p-6">
-          <p className="text-gray-600 text-center mb-6">
-            Please sign in to your account
-          </p>
+                 <div className="p-6">
+           <p className="text-gray-600 text-center mb-6">
+             Please login to continue to your account
+           </p>
 
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email
-              </label>
-              <div className="relative">
-                <input
-                  type="email"
-                  placeholder="jonas.kahnewald@gmail.com"
-                  className="input-field pl-10"
-                  {...register('email', {
-                    required: 'Email is required',
-                    pattern: {
-                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                      message: 'Invalid email address'
-                    }
-                  })}
-                />
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-              </div>
-              {errors.email && (
-                <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
-              )}
-            </div>
+           <form onSubmit={step === 'email' ? handleSubmitEmail(onSubmitEmail) : handleSubmitOTP(onSubmitOTP)} className="space-y-4">
+             <div>
+               <label className="block text-sm font-medium text-gray-700 mb-1">
+                 Email
+               </label>
+               <div className="relative">
+                 <input
+                   type="email"
+                   placeholder="jonas.kahnewald@gmail.com"
+                   className="input-field pl-10"
+                   {...registerEmail('email', {
+                     required: 'Email is required',
+                     pattern: {
+                       value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                       message: 'Invalid email address'
+                     }
+                   })}
+                 />
+                 <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+               </div>
+               {emailErrors.email && (
+                 <p className="text-red-500 text-sm mt-1">{emailErrors.email.message}</p>
+               )}
+             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Password
-              </label>
-              <div className="relative">
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  placeholder="OTP"
-                  className="input-field pr-10"
-                  {...register('password', {
-                    required: 'Password is required',
-                    minLength: {
-                      value: 6,
-                      message: 'Password must be at least 6 characters'
-                    }
-                  })}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                >
-                  {showPassword ? (
-                    <EyeOff className="w-5 h-5" />
-                  ) : (
-                    <Eye className="w-5 h-5" />
-                  )}
-                </button>
-              </div>
-              {errors.password && (
-                <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
-              )}
-            </div>
+             {step === 'email' ? (
+               <div>
+                 
+               </div>
+             ) : (
+               <div>
+                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                   OTP
+                 </label>
+                 <div className="relative">
+                   <input
+                     type="text"
+                     placeholder="Enter 6-digit OTP"
+                     className="input-field pr-10"
+                     {...registerOTP('otp', {
+                       required: 'OTP is required',
+                       pattern: {
+                         value: /^\d{6}$/,
+                         message: 'OTP must be 6 digits'
+                       }
+                     })}
+                   />
+                   <Smartphone className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+                 </div>
+                 {otpErrors.otp && (
+                   <p className="text-red-500 text-sm mt-1">{otpErrors.otp.message}</p>
+                 )}
+               </div>
+             )}
 
-            <div className="flex items-center justify-between">
-              <label className="flex items-center">
-                <input
-                  type="checkbox"
-                  className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                />
-                <span className="ml-2 text-sm text-gray-700">Keep me logged in</span>
-              </label>
-              <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700">
-                Forgot password?
-              </Link>
-            </div>
+             <button
+               type="submit"
+               disabled={loading}
+               className="btn-primary w-full py-3"
+             >
+               {loading ? <LoadingSpinner size="sm" /> : (step === 'email' ? 'Send OTP' : 'Verify OTP')}
+             </button>
+           </form>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn-primary w-full py-3"
-            >
-              {loading ? <LoadingSpinner size="sm" /> : 'Sign In'}
-            </button>
-          </form>
+           {step === 'otp' && (
+             <div className="mt-6 text-center">
+               <button
+                 onClick={handleResendOTP}
+                 disabled={loading || resendCountdown > 0}
+                 className={`text-sm ${
+                   resendCountdown > 0 
+                     ? 'text-gray-400 cursor-not-allowed' 
+                     : 'text-primary-600 hover:text-primary-700'
+                 }`}
+               >
+                 {resendCountdown > 0 
+                   ? `Resend OTP in ${resendCountdown}s` 
+                   : 'Resend OTP'
+                 }
+               </button>
+             </div>
+           )}
 
-          <div className="mt-6">
-            <button
-              onClick={handleGoogleSignIn}
-              className="w-full border border-gray-300 rounded-lg px-4 py-3 flex items-center justify-center space-x-2 hover:bg-gray-50 transition-colors"
-            >
-              <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-              <span>Continue with Google</span>
-            </button>
-          </div>
-
-          <div className="mt-6 text-center">
-            <Link to="/signup" className="text-primary-600 hover:text-primary-700">
-              Need an account? Create one
-            </Link>
-          </div>
+           <div className="mt-6 text-center">
+              Need an account ? {''}
+             <Link to="/signup" className="text-primary-600 hover:text-primary-700">
+               Create one
+             </Link>
+           </div>
+         </div>
         </div>
       </div>
 
-      {/* Desktop Layout */}
-      <div className="hidden md:flex min-h-screen">
-        <div className="flex-1 flex items-center justify-center p-8">
-          <div className="w-full max-w-md">
-            <div className="text-center mb-8">
-              <div className="w-16 h-16 bg-primary-600 rounded-full flex items-center justify-center text-white font-bold text-2xl mx-auto mb-4">
-                HD
-              </div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Sign in</h1>
-              <p className="text-gray-600">
-                Please sign in to your account
-              </p>
-            </div>
+             {/* Desktop Layout */}
+       <div className="hidden md:flex min-h-screen">
+         {/* Logo at top-left */}
+         <div className="absolute top-8 left-8 z-20">
+           <Logo width={64} height={26} />
+         </div>
+         
+         <div className="flex-1 flex items-center justify-center p-8">
+           <div className="w-full max-w-md">
+             <div className="text-left mb-8">
+               <h1 className="text-3xl font-bold text-gray-900 mb-2">Sign in</h1>
+               <p className="text-gray-600">
+                 Please login to continue to your account
+               </p>
+             </div>
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+            <form onSubmit={step === 'email' ? handleSubmitEmail(onSubmitEmail) : handleSubmitOTP(onSubmitOTP)} className="space-y-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Email
@@ -186,102 +229,96 @@ const SignIn: React.FC = () => {
                     type="email"
                     placeholder="jonas.kahnewald@gmail.com"
                     className="input-field pl-10"
-                    {...register('email', {
-                      required: 'Email is required',
-                      pattern: {
-                        value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
-                        message: 'Invalid email address'
-                      }
-                    })}
-                  />
-                  <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                </div>
-                {errors.email && (
-                  <p className="text-red-500 text-sm mt-1">{errors.email.message}</p>
-                )}
+                                      {...registerEmail('email', {
+                    required: 'Email is required',
+                    pattern: {
+                      value: /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i,
+                      message: 'Invalid email address'
+                    }
+                  })}
+                />
+                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+              </div>
+              {emailErrors.email && (
+                <p className="text-red-500 text-sm mt-1">{emailErrors.email.message}</p>
+              )}
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Password
-                </label>
-                <div className="relative">
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    placeholder="OTP"
-                    className="input-field pr-10"
-                    {...register('password', {
-                      required: 'Password is required',
-                      minLength: {
-                        value: 6,
-                        message: 'Password must be at least 6 characters'
-                      }
-                    })}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                  >
-                    {showPassword ? (
-                      <EyeOff className="w-5 h-5" />
-                    ) : (
-                      <Eye className="w-5 h-5" />
-                    )}
-                  </button>
+              {step === 'email' ? (
+                <div>
+                 
                 </div>
-                {errors.password && (
-                  <p className="text-red-500 text-sm mt-1">{errors.password.message}</p>
-                )}
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    OTP
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Enter 6-digit OTP"
+                      className="input-field pr-10"
+                                        {...registerOTP('otp', {
+                    required: 'OTP is required',
+                    pattern: {
+                      value: /^\d{6}$/,
+                      message: 'OTP must be 6 digits'
+                    }
+                  })}
+                />
+                <Smartphone className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-500 w-5 h-5" />
               </div>
-
-              <div className="flex items-center justify-between">
-                <label className="flex items-center">
-                  <input
-                    type="checkbox"
-                    className="w-4 h-4 text-primary-600 border-gray-300 rounded focus:ring-primary-500"
-                  />
-                  <span className="ml-2 text-sm text-gray-700">Keep me logged in</span>
-                </label>
-                <Link to="/forgot-password" className="text-sm text-primary-600 hover:text-primary-700">
-                  Forgot password?
-                </Link>
-              </div>
+              {otpErrors.otp && (
+                <p className="text-red-500 text-sm mt-1">{otpErrors.otp.message}</p>
+              )}
+                </div>
+              )}
 
               <button
                 type="submit"
                 disabled={loading}
                 className="btn-primary w-full py-3"
               >
-                {loading ? <LoadingSpinner size="sm" /> : 'Sign In'}
+                {loading ? <LoadingSpinner size="sm" /> : (step === 'email' ? 'Send OTP' : 'Verify OTP')}
               </button>
             </form>
 
-            <div className="mt-6">
-              <button
-                onClick={handleGoogleSignIn}
-                className="w-full border border-gray-300 rounded-lg px-4 py-3 flex items-center justify-center space-x-2 hover:bg-gray-50 transition-colors"
-              >
-                <img src="https://www.google.com/favicon.ico" alt="Google" className="w-5 h-5" />
-                <span>Continue with Google</span>
-              </button>
-            </div>
+            {step === 'otp' && (
+              <div className="mt-6 text-center">
+                <button
+                  onClick={handleResendOTP}
+                  disabled={loading || resendCountdown > 0}
+                  className={`text-sm ${
+                    resendCountdown > 0 
+                      ? 'text-gray-400 cursor-not-allowed' 
+                      : 'text-primary-600 hover:text-primary-700'
+                  }`}
+                >
+                  {resendCountdown > 0 
+                    ? `Resend OTP in ${resendCountdown}s` 
+                    : 'Resend OTP'
+                  }
+                </button>
+              </div>
+            )}
+
+            
 
             <div className="mt-6 text-center">
+              Need an account ? {''}
               <Link to="/signup" className="text-primary-600 hover:text-primary-700">
-                Need an account? Create one
+                Create one
               </Link>
             </div>
           </div>
         </div>
 
-        <div className="flex-1 bg-gradient-to-br from-primary-800 to-primary-900 wavy-bg flex items-center justify-center">
-          <div className="text-center text-white">
-            <h2 className="text-4xl font-bold mb-4">Welcome Back!</h2>
-            <p className="text-xl text-primary-100">
-              Sign in to access your notes and continue your journey
-            </p>
-          </div>
+                <div className="flex-1 relative overflow-hidden">
+          <img 
+            src="/right-column.png" 
+            alt="Highway Delite" 
+            className="w-full h-full object-cover"
+          />
         </div>
       </div>
     </div>

@@ -38,6 +38,8 @@ export interface UpdateNoteData {
 }
 
 export interface AuthResponse {
+  success: boolean
+  message: string
   token: string
   user: User
 }
@@ -79,7 +81,16 @@ export interface OTPData {
 
 export interface SignInData {
   email: string
-  password: string
+  password?: string // Optional for passwordless auth
+}
+
+export interface SignInEmailData {
+  email: string
+}
+
+export interface SignInOTPData {
+  email: string
+  otp: string
 }
 
 export interface FormField {
