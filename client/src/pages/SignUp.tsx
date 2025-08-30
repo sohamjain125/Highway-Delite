@@ -105,7 +105,7 @@ const SignUp: React.FC = () => {
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}
-            onError={(e) => {
+            onError={() => {
               console.error('Background image failed to load');
             }}
           />
