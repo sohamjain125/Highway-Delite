@@ -101,7 +101,7 @@ const SignUp: React.FC = () => {
           <div 
             className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-10"
             style={{
-              backgroundImage: 'url(/right-column.png)',
+              backgroundImage: 'url(./right-column.png)',
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}
@@ -301,10 +301,30 @@ const SignUp: React.FC = () => {
 
           <div className="flex-1 relative overflow-hidden">
             <img 
-              src="/right-column.png" 
+              src="./right-column.png" 
               alt="Highway Delite" 
               className="w-full h-full object-cover"
+              onError={(e) => {
+                console.error('Image failed to load:', e);
+                console.error('Image src:', e.currentTarget.src);
+                console.error('Image naturalWidth:', e.currentTarget.naturalWidth);
+                e.currentTarget.style.display = 'none';
+                // Show error message
+                const errorDiv = document.createElement('div');
+                errorDiv.innerHTML = 'Image failed to load. Check console for details.';
+                errorDiv.className = 'text-red-500 text-center p-4';
+                e.currentTarget.parentNode?.appendChild(errorDiv);
+              }}
+              onLoad={(e) => {
+                console.log('Image loaded successfully');
+                console.log('Image src:', './right-column.png');
+                console.log('Image naturalWidth:', e.currentTarget.naturalWidth);
+              }}
             />
+            {/* Debug info */}
+            <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-2 rounded">
+              Image path: ./right-column.png
+            </div>
           </div>
         </div>
       </div>
@@ -424,12 +444,14 @@ const SignUp: React.FC = () => {
 
              {/* Desktop Layout */}
        <div className="hidden md:flex min-h-screen">
+         {/* Logo at top-left */}
+         <div className="absolute top-8 left-8 z-20">
+           <Logo width={64} height={26} />
+         </div>
+         
          <div className="flex-1 flex items-center justify-center p-8">
-                      <div className="w-full max-w-md">
+           <div className="w-full max-w-md">
              <div className="text-left mb-8">
-               <div className="mb-4">
-                 <Logo width={64} height={26} />
-               </div>
                <h1 className="text-3xl font-bold text-gray-900 mb-2">Sign up</h1>
                <p className="text-gray-600">
                  Sign up to enjoy the features of Highway Delite
@@ -522,15 +544,30 @@ const SignUp: React.FC = () => {
 
         <div className="flex-1 relative overflow-hidden">
           <img 
-            src="/right-column.png" 
+            src="./right-column.png" 
             alt="Highway Delite" 
             className="w-full h-full object-cover"
             onError={(e) => {
               console.error('Image failed to load:', e);
+              console.error('Image src:', e.currentTarget.src);
+              console.error('Image naturalWidth:', e.currentTarget.naturalWidth);
               e.currentTarget.style.display = 'none';
+              // Show error message
+              const errorDiv = document.createElement('div');
+              errorDiv.innerHTML = 'Image failed to load. Check console for details.';
+              errorDiv.className = 'text-red-500 text-center p-4';
+              e.currentTarget.parentNode?.appendChild(errorDiv);
             }}
-            onLoad={() => console.log('Image loaded successfully')}
+            onLoad={(e) => {
+              console.log('Image loaded successfully');
+              console.log('Image src:', './right-column.png');
+              console.log('Image naturalWidth:', e.currentTarget.naturalWidth);
+            }}
           />
+          {/* Debug info */}
+          <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-2 rounded">
+            Image path: ./right-column.png
+          </div>
         </div>
       </div>
     </div>
