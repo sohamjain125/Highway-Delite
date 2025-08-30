@@ -26,27 +26,3 @@ export const getImagePath = (imageName: string): string => {
 export const getAssetPath = (assetName: string): string => {
   return getImagePath(assetName);
 };
-
-/**
- * Utility function to preload images for better performance
- */
-export const preloadImage = (src: string): Promise<void> => {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.onload = () => resolve();
-    img.onerror = reject;
-    img.src = src;
-  });
-};
-
-/**
- * Utility function to check if an image exists
- */
-export const checkImageExists = async (src: string): Promise<boolean> => {
-  try {
-    await preloadImage(src);
-    return true;
-  } catch {
-    return false;
-  }
-};
