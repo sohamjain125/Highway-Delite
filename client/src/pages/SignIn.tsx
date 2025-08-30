@@ -315,7 +315,7 @@ const SignIn: React.FC = () => {
 
                 <div className="flex-1 relative overflow-hidden">
           <img 
-            src="./right-column.png" 
+            src="/right-column.png" 
             alt="Highway Delite" 
             className="w-full h-full object-cover"
             onError={(e) => {
@@ -331,13 +331,13 @@ const SignIn: React.FC = () => {
             }}
             onLoad={(e) => {
               console.log('Image loaded successfully');
-              console.log('Image src:', './right-column.png');
+              console.log('Image src:', '/right-column.png');
               console.log('Image naturalWidth:', e.currentTarget.naturalWidth);
             }}
           />
           {/* Debug info */}
           <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-2 rounded">
-            Image path: ./right-column.png
+            Image path: /right-column.png
           </div>
         </div>
       </div>
