@@ -2,7 +2,7 @@
   "name": "highway-delite-server",
   "version": "1.0.0",
   "description": "Backend server for Highway Delite note-taking application",
-  "main": "dist/index.js",
+  "main": "dist/index.ts",
   "scripts": {
     "dev": "nodemon src/index.ts",
     "start": "node dist/index.ts",
