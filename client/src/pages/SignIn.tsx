@@ -7,6 +7,8 @@ import { useAuth } from '../contexts/AuthContext'
 import {  SignInEmailData, SignInOTPData } from '../types'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Logo from '../components/Logo'
+import ImageWithFallback from '../components/ImageWithFallback'
+import { getImagePath } from '../utils/imageUtils'
 
 const SignIn: React.FC = () => {
   const [step, setStep] = useState<'email' | 'otp'>('email')
@@ -314,30 +316,20 @@ const SignIn: React.FC = () => {
         </div>
 
                 <div className="flex-1 relative overflow-hidden">
-          <img 
-            src="/right-column.png" 
+          <ImageWithFallback 
+            src="right-column.png"
             alt="Highway Delite" 
             className="w-full h-full object-cover"
-            onError={(e) => {
-              console.error('Image failed to load:', e);
-              console.error('Image src:', e.currentTarget.src);
-              console.error('Image naturalWidth:', e.currentTarget.naturalWidth);
-              e.currentTarget.style.display = 'none';
-              // Show error message
-              const errorDiv = document.createElement('div');
-              errorDiv.innerHTML = 'Image failed to load. Check console for details.';
-              errorDiv.className = 'text-red-500 text-center p-4';
-              e.currentTarget.parentNode?.appendChild(errorDiv);
+            onError={() => {
+              console.error('Image failed to load');
             }}
-            onLoad={(e) => {
+            onLoad={() => {
               console.log('Image loaded successfully');
-              console.log('Image src:', '/right-column.png');
-              console.log('Image naturalWidth:', e.currentTarget.naturalWidth);
             }}
           />
           {/* Debug info */}
           <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-2 rounded">
-            Image path: /right-column.png
+            Image path: {getImagePath('right-column.png')}
           </div>
         </div>
       </div>
