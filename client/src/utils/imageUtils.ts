@@ -8,16 +8,14 @@ export const getImagePath = (imageName: string): string => {
     return `/${imageName}`;
   }
   
-  // In production, try different approaches
-  const baseUrl = import.meta.env.BASE_URL || '';
+  // In production, use the base URL with the image name
+  const baseUrl = import.meta.env.BASE_URL || '/';
   
-  // First try with base URL
-  if (baseUrl) {
-    return `${baseUrl}${imageName}`;
-  }
+  // Ensure baseUrl ends with / and imageName doesn't start with /
+  const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`;
+  const cleanImageName = imageName.startsWith('/') ? imageName.slice(1) : imageName;
   
-  // Fallback to relative path
-  return `./${imageName}`;
+  return `${cleanBaseUrl}${cleanImageName}`;
 };
 
 /**

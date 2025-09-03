@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { SignUpData, OTPData } from '../types'
 import LoadingSpinner from '../components/LoadingSpinner'
 import Logo from '../components/Logo'
+import { getImagePath } from '../utils/imageUtils'
 
 const SignUp: React.FC = () => {
   const [step, setStep] = useState<'signup' | 'otp'>('signup')
@@ -101,7 +102,7 @@ const SignUp: React.FC = () => {
           <div 
             className="absolute inset-0 bg-cover bg-center bg-no-repeat opacity-10"
             style={{
-              backgroundImage: 'url(/right-column.png)',
+              backgroundImage: `url(${getImagePath('right-column.png')})`,
               backgroundSize: 'cover',
               backgroundPosition: 'center'
             }}
@@ -301,7 +302,7 @@ const SignUp: React.FC = () => {
 
           <div className="flex-1 relative overflow-hidden">
             <img 
-              src="/right-column.png" 
+              src={getImagePath('right-column.png')} 
               alt="Highway Delite" 
               className="w-full h-full object-cover"
               onError={(e) => {
@@ -317,13 +318,13 @@ const SignUp: React.FC = () => {
               }}
               onLoad={(e) => {
                 console.log('Image loaded successfully');
-                console.log('Image src:', '/right-column.png');
+                console.log('Image src:', getImagePath('right-column.png'));
                 console.log('Image naturalWidth:', e.currentTarget.naturalWidth);
               }}
             />
             {/* Debug info */}
             <div className="absolute top-2 left-2 bg-black bg-opacity-50 text-white text-xs p-2 rounded">
-              Image path: /right-column.png
+              Image path: {getImagePath('right-column.png')}
             </div>
           </div>
         </div>

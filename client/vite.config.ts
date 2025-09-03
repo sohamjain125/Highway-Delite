@@ -17,8 +17,9 @@ export default defineConfig({
         assetFileNames: (assetInfo) => {
           const info = assetInfo.name?.split('.') || []
           const ext = info[info.length - 1]
+          // Keep public assets in root for easier access
           if (/png|jpe?g|svg|gif|tiff|bmp|ico/i.test(ext || '')) {
-            return `assets/images/[name]-[hash][extname]`
+            return `[name]-[hash][extname]`
           }
           return `assets/[name]-[hash][extname]`
         },
