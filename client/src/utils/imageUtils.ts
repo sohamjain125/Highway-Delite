@@ -24,3 +24,4 @@ export const getImagePath = (imageName: string): string => {
 export const getAssetPath = (assetName: string): string => {
   return getImagePath(assetName);
 };
+
